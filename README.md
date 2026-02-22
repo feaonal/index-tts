@@ -1,4 +1,184 @@
 
+# 🐳 Index-TTS Docker 镜像
+
+> 基于 [index-tts/index-tts](https://github.com/index-tts/index-tts) 官方项目构建的容器化部署方案
+
+[![Docker Pulls](https://img.shields.io/docker/pulls/feaonal/index-tts)](https://hub.docker.com/r/feaonal/index-tts)
+[![Image Size](https://img.shields.io/docker/image-size/feaonal/index-tts/latest)](https://hub.docker.com/r/feaonal/index-tts)
+[![Platform](https://img.shields.io/badge/platform-linux%2Famd64%2Carm64-blue)](https://hub.docker.com/r/feaonal/index-tts)
+
+---
+
+## 📋 项目简介
+
+`feaonal/index-tts` 是 **Index-TTS** 项目的官方 Docker 镜像，提供开箱即用的文本转语音（Text-to-Speech）服务。通过容器化部署，简化环境配置流程，支持 GPU 加速推理，适用于本地开发、测试及生产环境。
+
+🔗 官方源码：https://github.com/index-tts/index-tts
+
+---
+
+## ✨ 核心特性
+
+- 🚀 **一键部署**：预装 PyTorch、CUDA、UV 等依赖，无需手动配置环境
+- 🎯 **GPU 加速**：原生支持 NVIDIA Docker，自动调用 GPU 提升推理速度
+- 🔁 **持久化存储**：支持模型 checkpoints、HF/UV 缓存目录挂载，避免重复下载
+- 🌐 **网络友好**：内置 HuggingFace 国内镜像源，加速模型拉取
+- ⚙️ **灵活配置**：通过环境变量和启动参数自定义服务行为
+- 🔄 **自动重启**：`restart: unless-stopped` 策略保障服务高可用
+
+---
+
+## 🚀 快速开始
+
+### 方式一：Docker Run
+
+```bash
+docker run -d \
+  --name index-tts \
+  --gpus all \
+  -p 7860:7860 \
+  -v $(pwd)/checkpoints:/app/checkpoints \
+  -v $(pwd)/hf_cache:/root/.cache/huggingface \
+  -v $(pwd)/uv_cache:/root/.cache/uv \
+  -e HF_ENDPOINT=https://hf-mirror.com \
+  -e CUDA_VISIBLE_DEVICES=0 \
+  -e PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512 \
+  feaonal/index-tts:latest \
+  --host 0.0.0.0 --port 7860 --fp16 --model_dir /app/checkpoints
+```
+
+### 方式二：Docker Compose（推荐）
+
+创建 `docker-compose.yml`：
+
+```yaml
+services:
+  indextts:
+    build: .
+    image: feaonal/index-tts:latest
+    container_name: index-tts
+    restart: unless-stopped
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./checkpoints:/app/checkpoints
+      - ./hf_cache:/root/.cache/huggingface
+      - ./uv_cache:/root/.cache/uv
+    command: --host 0.0.0.0 --port 7860 --fp16 --model_dir /app/checkpoints
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - HF_ENDPOINT=https://hf-mirror.com
+      - UV_LINK_MODE=copy
+      - CUDA_VISIBLE_DEVICES=0
+      - PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+      - PYTHONUNBUFFERED=1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities:
+                - gpu
+```
+
+启动服务：
+
+```bash
+docker compose up -d
+```
+
+访问服务：`http://localhost:7860`
+
+---
+
+## ⚙️ 配置说明
+
+### 🔌 端口映射
+
+| 容器端口 | 主机端口 | 说明 |
+|---------|---------|------|
+| `7860`  | `7860` | Web UI / API 服务端口（可自定义）|
+
+### 📁 卷挂载建议
+
+| 挂载路径 | 用途 | 建议 |
+|---------|------|------|
+| `/app/checkpoints` | 模型权重存储 | ✅ 必挂，避免重启丢失模型 |
+| `/root/.cache/huggingface` | HF 模型缓存 | ✅ 推荐，加速二次启动 |
+| `/root/.cache/uv` | Python 依赖缓存 | ✅ 推荐，减少重复安装 |
+
+### 🌍 关键环境变量
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `HF_ENDPOINT` | `https://hf-mirror.com` | HuggingFace 国内镜像加速 |
+| `CUDA_VISIBLE_DEVICES` | `0` | 指定使用的 GPU 设备编号 |
+| `PYTORCH_CUDA_ALLOC_CONF` | `max_split_size_mb:512` | 优化 CUDA 内存分配，防止 OOM |
+| `UV_LINK_MODE` | `copy` | UV 包管理器链接策略，提升兼容性 |
+| `PYTHONUNBUFFERED` | `1` | 禁用 Python 输出缓冲，便于日志追踪 |
+
+### 🎯 启动参数（command）
+
+```bash
+--host 0.0.0.0          # 监听所有网络接口
+--port 7860             # 服务运行端口（容器内）
+--fp16                  # 启用半精度推理，节省显存 + 加速
+--model_dir /app/checkpoints  # 模型加载路径
+```
+
+---
+
+## 🔍 镜像信息
+
+| 项目 | 值 |
+|------|-----|
+| 镜像名称 | `feaonal/index-tts` |
+| 标签 | `latest` |
+| 架构支持 | `linux/amd64`, `linux/arm64` |
+| 更新频率 | 跟随官方项目迭代 |
+| 最后推送 | 约 2 小时前 |
+
+查看镜像详情：
+```bash
+docker inspect feaonal/index-tts:latest
+```
+
+---
+
+## 🛠️ 常见问题
+
+### ❓ 如何更新镜像？
+```bash
+docker pull feaonal/index-tts:latest
+docker compose up -d --force-recreate
+```
+
+### ❓ GPU 无法识别？
+- 确保主机已安装 [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- 执行 `nvidia-smi` 验证驱动正常
+- 检查 `docker run` 是否添加 `--gpus all` 参数
+
+### ❓ 模型下载慢？
+- 已默认配置 `HF_ENDPOINT=https://hf-mirror.com` 国内镜像
+- 确保 `hf_cache` 卷正确挂载，避免重复下载
+
+### ❓ 显存不足/OOM？
+- 尝试添加 `--fp16` 参数启用半精度
+- 调整 `PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256` 降低单次分配大小
+- 通过 `CUDA_VISIBLE_DEVICES` 指定显存更充足的 GPU
+
+---
+
+## 📄 许可证
+
+本项目遵循 Index-TTS 官方许可证，详情请参阅：  
+👉 https://github.com/index-tts/index-tts/blob/main/LICENSE
+
+---
+
+> 💡 **提示**：首次启动时，容器会自动下载模型文件，请确保网络畅通并预留足够磁盘空间（建议 ≥20GB）。
 
 <div align="center">
 <img src='assets/index_icon.png' width="250"/>
